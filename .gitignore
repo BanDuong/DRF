@@ -3,5 +3,8 @@ env
 venv
 .venv
 .db
+.sqlite3
 .sqlite
+db.sqlite3
+db.sqlite
 .sql
