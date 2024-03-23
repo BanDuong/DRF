@@ -1,32 +1,73 @@
+import jwt
 from django.contrib.auth.models import User
 from rest_framework.authentication import TokenAuthentication
 # from django.shortcuts import render
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Person
-from .serializers import (GetAllUserSerializer, LoginSerializer,
-                          PersonSerializer, RegisterSerializer)
+from .serializers import (GetAllUserSerializer, LoginJWTSerializer,
+                          LoginSerializer, PersonSerializer,
+                          RegisterSerializer)
 
 # Create your views here.
 
+
 class GetOneUser(APIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
     
-    def get(self, request, id):
-        user = User.objects.get(id=id)
+    # permission_classes = [IsAuthenticated]
+    # authentication_classes = [TokenAuthentication]
+    
+    def get(self, request):
+        token = request.COOKIES.get('jwtToken')
+        if not token:
+            raise AuthenticationFailed("Token is not available")
+        
+        try:
+            payload = jwt.decode(token, key='secret', algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed("Unauthentication Token")
+            
+        
+        user = User.objects.get(id=payload['id'])
         serializer = GetAllUserSerializer(instance=user)
         return Response(serializer.data)  
-          
+
+class LoginJWT(APIView):
+    
+    def post(self, request):
+        data = request.data
+        serializer = LoginJWTSerializer(data=data)
+        
+        if not serializer.is_valid():
+            return Response({"error": "Invalid Data"}, status=400)
+        
+        respone = Response()
+        respone.set_cookie(key='jwtToken', value=serializer.validated_data['token'])
+        respone.data = {
+            'data': serializer.validated_data
+        }    
+            
+        return respone
+
+
+class LogoutJWT(APIView):
+    
+    def post(self, request):
+        response = Response()
+        response.delete_cookie('jwtToken')
+        response.data = {
+            "message": "Successfully logout"
+        }
+        return response
           
 class LoginUser(APIView):
     
     def post(self, request):
-        pass
         data = request.data
         serializer = LoginSerializer(data=data)
         
